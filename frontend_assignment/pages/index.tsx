@@ -1,13 +1,19 @@
 import detectEthereumProvider from "@metamask/detect-provider"
 import { Strategy, ZkIdentity } from "@zk-kit/identity"
 import { generateMerkleProof, Semaphore } from "@zk-kit/protocols"
-import { providers } from "ethers"
+import Greeter from "artifacts/contracts/Greeters.sol/Greeters.json"
+import { Contract, providers, utils } from "ethers"
 import Head from "next/head"
 import React from "react"
 import styles from "../styles/Home.module.css"
 
+import { useForm } from "react-hook-form";
+import { yupResolver } from '@hookform/resolvers/yup';
+import * as yup from "yup";
+
 export default function Home() {
     const [logs, setLogs] = React.useState("Connect your wallet and greet!")
+    const [event, setEvent] = React.useState('')
 
     async function greet() {
         setLogs("Creating your Semaphore identity...")
@@ -57,8 +63,35 @@ export default function Home() {
         } else {
             setLogs("Your anonymous greeting is onchain :)")
         }
+
+        const contract = new Contract(
+            "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
+            Greeter.abi
+          );
+          const provider2 = new providers.JsonRpcProvider("http://localhost:8545");
+          const contractOwner = contract.connect(provider2.getSigner());
+          contractOwner.on("NewGreeting", (greeting: string) => {
+            setEvent(utils.parseBytes32String(greeting));
+          });
     }
 
+    interface IFormInputs {
+        firstName: string
+        age: number
+        address: string
+      }
+      
+      const schema = yup.object({
+        firstName: yup.string().required(),
+        age: yup.number().positive().integer().required(),
+        address: yup.string().required()
+      }).required();
+       
+      const { register, handleSubmit, formState: { errors } } = useForm<IFormInputs>({
+        resolver: yupResolver(schema)
+      });
+      const onSubmit = (data: IFormInputs) => console.log(data);
+    
     return (
         <div className={styles.container}>
             <Head>
@@ -77,6 +110,24 @@ export default function Home() {
                 <div onClick={() => greet()} className={styles.button}>
                     Greet
                 </div>
+
+                <h2>Event: {event} </h2>
+
+                <form onSubmit={handleSubmit(onSubmit)}>
+      <label  className="fname" htmlFor="">First Name &nbsp;</label>
+      <input {...register("firstName")} />
+      <p>{errors.firstName?.message}</p>
+
+      <label className="fname" htmlFor="">Age &nbsp;</label>
+      <input {...register("age")} />
+      <p>{errors.age?.message}</p>
+
+      <label className="fname" htmlFor="">Address</label>
+      <textarea {...register("address")}/>
+      <p>{errors.address?.message}</p>
+      
+      <input className="sbtn" type="submit" />
+    </form>
             </main>
         </div>
     )
